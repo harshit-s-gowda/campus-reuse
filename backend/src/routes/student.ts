@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { getStudentDashboard, listProducts, listOrders, listNotifications, markNotificationsRead } from '../db/index.js';
+import { asyncRoute } from '../middleware/errors.js';
+import { requireAuth, type AuthRequest } from '../middleware/auth.js';
+const router=Router();
+router.use(requireAuth);
+router.get('/dashboard', asyncRoute(async (req:AuthRequest,res)=>res.json({ stats:await getStudentDashboard(req.user!.id) })));
+router.get('/listings', asyncRoute(async (req:AuthRequest,res)=>res.json(await listProducts({ mine:req.user!.id, status:req.query.status as string, sort:'recent', page:1, limit:100 }))));
+router.get('/orders', asyncRoute(async (req:AuthRequest,res)=>res.json({ orders:await listOrders(req.user!.id) })));
+router.get('/notifications', asyncRoute(async (req:AuthRequest,res)=>res.json({ notifications:await listNotifications(req.user!.id) })));
+router.patch('/notifications/read', asyncRoute(async (req:AuthRequest,res)=>{await markNotificationsRead(req.user!.id);res.json({ok:true})}));
+export default router;

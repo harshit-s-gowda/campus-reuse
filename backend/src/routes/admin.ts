@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { addNotification, getAdminDashboard, listAdminProducts, listUsers, setUserStatus, updateProductStatus } from '../db/index.js';
+import { asyncRoute } from '../middleware/errors.js';
+import { requireAuth, requireRole, type AuthRequest } from '../middleware/auth.js';
+import { statusSchema } from '../middleware/schemas.js';
+const router=Router(); router.use(requireAuth,requireRole('ADMIN'));
+router.get('/dashboard',asyncRoute(async(_req,res)=>res.json({stats:await getAdminDashboard()})));
+router.get('/products',asyncRoute(async(req,res)=>res.json({products:await listAdminProducts(req.query.status as string)})));
+router.patch('/products/:id/status',asyncRoute(async(req,res)=>{const input=statusSchema.parse(req.body);const product=await updateProductStatus(Number(req.params.id),input.status,input.reason);if(!product)return res.status(404).json({message:'Listing not found'});await addNotification(product.sellerId,`Listing ${input.status.toLowerCase()}`,input.status==='APPROVED'?`${product.title} is now live in the marketplace.`:`${product.title} was ${input.status.toLowerCase()}. ${input.reason||''}`,'MODERATION');res.json({product});}));
+router.patch('/products/:id/approve',asyncRoute(async(req,res)=>{req.body={status:'APPROVED'};const input=statusSchema.parse(req.body);const product=await updateProductStatus(Number(req.params.id),input.status);if(!product)return res.status(404).json({message:'Listing not found'});await addNotification(product.sellerId,'Listing approved',`${product.title} is now live in the marketplace.`,'MODERATION');res.json({product});}));
+router.patch('/products/:id/reject',asyncRoute(async(req,res)=>{const input=statusSchema.parse({status:'REJECTED',reason:req.body.reason});const product=await updateProductStatus(Number(req.params.id),input.status,input.reason);if(!product)return res.status(404).json({message:'Listing not found'});await addNotification(product.sellerId,'Listing rejected',`${product.title} needs changes. ${input.reason||''}`,'MODERATION');res.json({product});}));
+router.get('/users',asyncRoute(async(req,res)=>res.json({users:await listUsers(req.query.search as string)})));
+router.patch('/users/:id/status',asyncRoute(async(req,res)=>{const status=req.body.status==='SUSPENDED'?'SUSPENDED':'ACTIVE';res.json({user:await setUserStatus(Number(req.params.id),status)});}));
+export default router;
